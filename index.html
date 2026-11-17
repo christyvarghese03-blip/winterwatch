@@ -266,7 +266,8 @@ async function loadHistory() {
   const check = {
     rows: all.length,
     runs: all.filter(r => yes(r.gritted)).length,
-    salt: all.reduce((s, r) => s + (num(r.salt_t) || 0), 0)
+    // add in whole hundredths of a tonne so floating-point error can't creep in
+    salt: Math.round(all.reduce((s, r) => s + Math.round((num(r.salt_t) || 0) * 100), 0) / 10) / 10
   };
 
   // Drop impossible temperatures (above 40 C or below -40 C) and count them
@@ -312,8 +313,8 @@ function renderHistory() {
     `<h2>Five winters, summarised</h2>
      <p class="small">Source: history.csv. Check figures on the raw log:
        rows ${c.rows} ${ok(c.rows, 7560)} &middot; gritting runs ${c.runs} ${ok(c.runs, 439)} &middot;
-       salt ${c.salt.toFixed(1)} t ${ok(Math.round(c.salt * 10) / 10, 1152.5)} &middot;
-       <b>${h.excluded} row(s) excluded</b> for impossible temperatures.</p>
+       salt ${c.salt.toFixed(1)} t ${ok(c.salt, 1152.5)} &middot;
+       <b>${h.excluded} row(s) excluded</b> for impossible temperatures, so the table totals below are slightly lower than the raw check figures.</p>
      <table><tr>${head.map(x => `<th>${x}</th>`).join('')}</tr>
      ${h.list.map(s => row(s, s.route_id + ' ' + s.route)).join('')}
      ${row(h.totals, '<b>TOTAL</b>')}</table>`;
