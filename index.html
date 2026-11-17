@@ -83,13 +83,14 @@ async function askModel(system, user) {
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: model || 'claude-haiku-5-5', max_tokens: 1200, system,
+        model: model || 'claude-haiku-5-5', max_tokens: 4000, system,
         messages: [{ role: 'user', content: user }]
       })
     });
     const j = await r.json();
     if (!r.ok) throw new Error(r.status + ' ' + (j.error?.message || JSON.stringify(j)));
-    return { text: j.content.map(c => c.text || '').join(''),
+    const cut = j.stop_reason === 'max_tokens' ? '\n\n[WARNING: answer cut off at the token limit]' : '';
+    return { text: j.content.filter(c => c.type === 'text').map(c => c.text).join('') + cut,
              tokensIn: j.usage.input_tokens, tokensOut: j.usage.output_tokens };
   } else {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -158,7 +159,7 @@ async function tonight() {
     + '?latitude=' + routes.map(r => r.lat).join(',')
     + '&longitude=' + routes.map(r => r.lon).join(',')
     + '&hourly=temperature_2m,soil_temperature_0cm,dew_point_2m,precipitation'
-    + '&forecast_hours=24&timezone=Europe%2FDublin';
+    + '&forecast_days=2&timezone=Europe%2FDublin';   // 2 days so we can cut out 16:00 today -> 10:00 tomorrow
   const fcRes = await fetch(fcUrl, { cache: 'no-store' });
   if (!fcRes.ok) throw new Error('Open-Meteo -> HTTP ' + fcRes.status);
   let fc = await fcRes.json();
@@ -168,12 +169,18 @@ async function tonight() {
   // Step 1-2: freezing and wet tests per route
   const rows = routes.map((r, i) => {
     const h = fc[i].hourly;
-    const n = Math.min(18, h.time.length);          // next 18 hours
+    // "Tonight" = the 18 hours from 16:00 (the plan's check time) to 10:00 next morning.
+    // Before 16:00 we look at tonight; after midnight we look at the night we're in.
+    const now = new Date();
+    const start = new Date(now); start.setHours(16, 0, 0, 0);
+    if (now.getHours() < 10) start.setDate(start.getDate() - 1);
+    const end = new Date(start.getTime() + 18 * 3600e3);
+    const idx = h.time.map((s, k) => [new Date(s), k]).filter(([d]) => d >= start && d < end).map(([, k]) => k);
     const pr = Number(r.priority), limit = LIMIT[pr];
-    const g = h.soil_temperature_0cm.slice(0, n);
-    const dew = h.dew_point_2m.slice(0, n);
-    const rain = h.precipitation.slice(0, n);
-    const t = h.time.slice(0, n).map(s => new Date(s));
+    const g = idx.map(k => h.soil_temperature_0cm[k]);
+    const dew = idx.map(k => h.dew_point_2m[k]);
+    const rain = idx.map(k => h.precipitation[k]);
+    const t = idx.map(k => new Date(h.time[k]));
 
     let minG = Infinity, minAt = null;
     g.forEach((v, k) => { if (v != null && v < minG) { minG = v; minAt = t[k]; } });
@@ -191,7 +198,8 @@ async function tonight() {
       min_at: minAt ? hhmm(minAt) : '-',
       first_freeze: k0 >= 0 ? hhmm(t[k0]) : 'none',
       wet, freezes, t0: t[0],
-      target: k0 >= 0 ? t[k0] : (kLim >= 0 ? t[kLim] : null)
+      // finish 1 h before ground hits 0 C; if it never does, 1 h before the coldest hour
+      target: k0 >= 0 ? t[k0] : minAt
     };
   });
 
@@ -219,9 +227,10 @@ async function tonight() {
     if (!r.cls || r.cls === 'no' || !r.target) return;
     const leave = new Date(r.target.getTime() - (1 + r.length_km / 20) * 3600e3);
     leave.setMinutes(Math.floor(leave.getMinutes() / 15) * 15, 0, 0);
-    const earliest = new Date(r.t0); earliest.setHours(17, 0, 0, 0);
-    if (r.t0.getHours() < 12) earliest.setDate(earliest.getDate() - 1);
-    if (leave < earliest) { r.leave = '17:00'; r.why += '; target needs earlier, so leave at 17:00 (finishes late - engineer note)'; }
+    const earliest = new Date(r.t0); earliest.setHours(17, 0, 0, 0);       // t0 is 16:00 on the night
+    const latest = new Date(earliest.getTime() + 12 * 3600e3);             // 05:00 next morning
+    if (leave < earliest) { r.leave = '17:00'; r.why += `; would need to leave ${hhmm(leave)}, but plan says not before 17:00, so run finishes late (engineer note)`; }
+    else if (leave > latest) { r.leave = '05:00'; r.why += '; latest departure is 05:00'; }
     else r.leave = hhmm(leave);
   });
 
@@ -264,7 +273,9 @@ $('ask').onclick = async () => {
       `Question from the engineer: ${$('question').value}`;
     $('answer').textContent = 'Thinking...';
     const a = await askModel(SYSTEM, user);
-    $('answer').textContent = a.text + `\n\n[tokens in ${a.tokensIn}, out ${a.tokensOut}]`;
+    const safe = a.text.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');   // show **bold** as bold
+    $('answer').innerHTML = safe + `\n\n[tokens in ${a.tokensIn}, out ${a.tokensOut}]`;
   } catch (e) {
     $('answer').textContent = 'Error: ' + e.message;
   }
