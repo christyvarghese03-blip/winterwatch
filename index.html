@@ -278,9 +278,12 @@ async function loadHistory() {
 
   const byRoute = {};
   clean.forEach(r => {
-    const s = byRoute[r.route_id] ??= { route_id: r.route_id, route: r.route, priority: r.priority,
-      nights: 0, runs: 0, salt: 0, ice: 0, ice_treated: 0, ice_untreated: 0, no_salt: 0, frost_nights: 0 };
+    const s = byRoute[r.route_id] ??= { route_id: r.route_id, route: r.route, priority: r.priority, depot: r.depot,
+      nights: 0, runs: 0, salt: 0, ice: 0, ice_treated: 0, ice_untreated: 0, no_salt: 0, frost_nights: 0,
+      warmest: -Infinity, warmest_date: '' };
     const ice = num(r.ice_incidents) || 0;
+    const air = num(r.min_air_c);
+    if (air > s.warmest) { s.warmest = air; s.warmest_date = r.date; }
     s.nights++;
     s.salt += num(r.salt_t) || 0;
     s.ice += ice;
@@ -295,8 +298,8 @@ async function loadHistory() {
 
   const text = `Five winters, summarised (source: history.csv, ${check.rows} rows; ` +
     `${excluded} row(s) excluded for impossible temperatures):\n` +
-    'route | priority | nights | runs | salt t | ice total | ice on treated nights | ice on untreated nights | "no salt" nights | nights ground <= 0 C\n' +
-    list.map(s => `${s.route_id} ${s.route} | P${s.priority} | ${s.nights} | ${s.runs} | ${s.salt.toFixed(1)} | ${s.ice} | ${s.ice_treated} | ${s.ice_untreated} | ${s.no_salt} | ${s.frost_nights}`).join('\n') +
+    'route | priority | depot | nights | runs | salt t | ice total | ice on treated nights | ice on untreated nights | "no salt" nights (depot ran out) | nights ground <= 0 C | warmest night (highest min_air_c, after excluding impossible rows)\n' +
+    list.map(s => `${s.route_id} ${s.route} | P${s.priority} | ${s.depot} | ${s.nights} | ${s.runs} | ${s.salt.toFixed(1)} | ${s.ice} | ${s.ice_treated} | ${s.ice_untreated} | ${s.no_salt} | ${s.frost_nights} | ${s.warmest} C on ${s.warmest_date}`).join('\n') +
     `\nTOTAL | | ${totals.nights} | ${totals.runs} | ${totals.salt.toFixed(1)} | ${totals.ice} | ${totals.ice_treated} | ${totals.ice_untreated} | ${totals.no_salt} | ${totals.frost_nights}`;
 
   HISTORY = { check, excluded, list, totals, text };
@@ -306,9 +309,10 @@ async function loadHistory() {
 function renderHistory() {
   const h = HISTORY, c = h.check;
   const ok = (a, b) => a === b ? '&#10003;' : '&#10007; expected ' + b;
-  const head = ['route','priority','nights','runs','salt (t)','ice total','ice, treated nights','ice, untreated nights','"no salt" nights','nights ground &le; 0 C'];
-  const row = (s, name) => '<tr>' + [name, s.priority ? 'P' + s.priority : '', s.nights, s.runs, s.salt.toFixed(1),
-    s.ice, s.ice_treated, s.ice_untreated, s.no_salt, s.frost_nights].map(v => `<td>${v}</td>`).join('') + '</tr>';
+  const head = ['route','priority','depot','nights','runs','salt (t)','ice total','ice, treated nights','ice, untreated nights','"no salt" nights','nights ground &le; 0 C','warmest night (C)'];
+  const row = (s, name) => '<tr>' + [name, s.priority ? 'P' + s.priority : '', s.depot || '', s.nights, s.runs, s.salt.toFixed(1),
+    s.ice, s.ice_treated, s.ice_untreated, s.no_salt, s.frost_nights,
+    s.warmest_date ? `${s.warmest} (${s.warmest_date})` : ''].map(v => `<td>${v}</td>`).join('') + '</tr>';
   $('history').innerHTML =
     `<h2>Five winters, summarised</h2>
      <p class="small">Source: history.csv. Check figures on the raw log:
