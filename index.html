@@ -2,50 +2,187 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Winter Watch</title>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
-  fieldset { margin-bottom: 1rem; }
-  label { display: block; margin: .4rem 0 .2rem; }
-  input, select, textarea { width: 100%; box-sizing: border-box; padding: .4rem; }
-  button { margin-top: .6rem; padding: .5rem 1rem; }
-  #answer { white-space: pre-wrap; background: #f4f4f4; padding: 1rem; min-height: 3rem; }
-  table { border-collapse: collapse; width: 100%; font-size: .85rem; margin-top: 1rem; }
-  th, td { border: 1px solid #ccc; padding: .3rem .4rem; text-align: left; vertical-align: top; }
-  th { background: #eee; }
-  .treat { background: #e6f4ea; } .flag { background: #fdecea; } .no { background: #fafafa; }
-  .small { color: #666; font-size: .85rem; }
+  :root {
+    --bg: #f5f7fa; --surface: #ffffff; --surface-2: #f0f3f7; --border: #e2e7ee;
+    --text: #18212f; --muted: #627083; --accent: #2563eb; --accent-soft: #e8efff;
+    --treat: #0f7b4b; --treat-bg: #e6f6ee; --flag: #b42318; --flag-bg: #fdecea;
+    --no: #627083; --no-bg: #f0f3f7; --radius: 14px;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e131b; --surface: #161d28; --surface-2: #1d2633; --border: #283344;
+      --text: #e7ecf3; --muted: #93a1b5; --accent: #6b9bff; --accent-soft: #1d2a45;
+      --treat: #4ade9b; --treat-bg: #12301f; --flag: #ff8a80; --flag-bg: #3a1a1a;
+      --no: #93a1b5; --no-bg: #1d2633; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px 48px; }
+
+  /* Top bar */
+  header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 85%, transparent);
+           backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+  .bar { max-width: 1120px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #3b82f6, #06b6d4);
+          display: grid; place-items: center; color: #fff; font-size: 18px; }
+  .title { font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: 12.5px; }
+  .spacer { flex: 1; }
+  .status { font-size: 12.5px; padding: 5px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+  .status.ok { background: var(--treat-bg); color: var(--treat); }
+  .status.warn { background: var(--flag-bg); color: var(--flag); }
+  .icon-btn { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
+              color: var(--text); cursor: pointer; display: grid; place-items: center; }
+  .icon-btn:hover { background: var(--surface-2); }
+
+  /* Settings drawer */
+  .scrim { position: fixed; inset: 0; background: rgba(10,15,25,.35); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
+  .drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(380px, 92vw); background: var(--surface);
+            border-left: 1px solid var(--border); transform: translateX(100%); transition: transform .25s ease; z-index: 21;
+            padding: 22px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+  body.settings-open .scrim { opacity: 1; pointer-events: auto; }
+  body.settings-open .drawer { transform: none; }
+  .drawer h2 { margin: 0; font-size: 18px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .hint { font-size: 12.5px; color: var(--muted); }
+
+  input, select, textarea { width: 100%; font: inherit; color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .btn { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer;
+         background: var(--accent); color: #fff; }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:disabled { opacity: .6; cursor: wait; }
+  .btn.ghost { background: var(--surface-2); color: var(--text); }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-top: 20px; }
+  .card h2 { margin: 0 0 4px; font-size: 17px; letter-spacing: -.01em; }
+  .card .meta { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
+
+  /* KPI tiles */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 20px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+  .kpi .label { color: var(--muted); font-size: 12.5px; }
+  .kpi .value { font-size: 24px; font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
+  .kpi .note { color: var(--muted); font-size: 12px; }
+  .kpi.treat .value { color: var(--treat); } .kpi.flag .value { color: var(--flag); }
+
+  /* Ask */
+  .ask-row { display: flex; gap: 10px; align-items: flex-end; }
+  .ask-row textarea { resize: vertical; min-height: 52px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip { font-size: 12.5px; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--border);
+          background: var(--surface-2); color: var(--text); cursor: pointer; }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  #answer { white-space: pre-wrap; line-height: 1.6; }
+  #answer:empty::before { content: 'Ask a question to get a recommendation. The Duty Engineer makes the final call.'; color: var(--muted); }
+  .tokens { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .loading { color: var(--muted); }
+  .loading::after { content: ''; display: inline-block; width: 12px; height: 12px; margin-left: 8px; vertical-align: -1px;
+                    border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 9px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+  th { background: var(--surface-2); color: var(--muted); font-weight: 600; font-size: 12px; position: sticky; top: 0; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; }
+  tr.total td { font-weight: 700; background: var(--surface-2); }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .pill.treat { background: var(--treat-bg); color: var(--treat); }
+  .pill.flag { background: var(--flag-bg); color: var(--flag); }
+  .pill.no { background: var(--no-bg); color: var(--no); }
+  .why { color: var(--muted); font-size: 12px; max-width: 280px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .check { font-size: 12.5px; padding: 5px 10px; border-radius: 999px; }
+  .check.pass { background: var(--treat-bg); color: var(--treat); }
+  .check.fail { background: var(--flag-bg); color: var(--flag); }
+  .check.info { background: var(--surface-2); color: var(--muted); }
+  footer { color: var(--muted); font-size: 12px; margin-top: 28px; text-align: center; }
+  @media (max-width: 640px) { .ask-row { flex-direction: column; align-items: stretch; } .sub { display: none; } }
 </style>
 </head>
 <body>
-<h1>Winter Watch</h1>
-<p class="small">Decision support only. The Duty Engineer makes the final call and records it in the night log.</p>
+<header>
+  <div class="bar">
+    <div class="logo" aria-hidden="true">&#10052;</div>
+    <div>
+      <div class="title">Winter Watch</div>
+      <div class="sub">Gritting decision support &middot; County Cavan (fictional)</div>
+    </div>
+    <div class="spacer"></div>
+    <span id="status" class="status">Checking settings&hellip;</span>
+    <button class="icon-btn" id="openSettings" title="Settings" aria-label="Open settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</header>
 
-<fieldset>
-  <legend>Settings (stored only in this browser)</legend>
-  <label for="provider">Provider</label>
-  <select id="provider">
-    <option value="anthropic">Anthropic</option>
-    <option value="openai">OpenAI</option>
-  </select>
-  <label for="model">Model</label>
-  <input id="model" placeholder="e.g. claude-haiku-5-5 or gpt-4o-mini">
-  <label for="key">API key</label>
-  <input id="key" type="password" placeholder="Paste your key - never commit it">
-  <button id="save">Save settings</button>
-  <span id="saved" class="small"></span>
-</fieldset>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Settings">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <h2>Settings</h2>
+    <button class="icon-btn" id="closeSettings" aria-label="Close settings">&#10005;</button>
+  </div>
+  <p class="hint">Stored only in this browser. Your key is never written to the repo.</p>
+  <div class="field">
+    <label for="provider">Provider</label>
+    <select id="provider">
+      <option value="anthropic">Anthropic</option>
+      <option value="openai">OpenAI</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="model">Model</label>
+    <input id="model" placeholder="claude-haiku-5-5 or gpt-4o-mini">
+  </div>
+  <div class="field">
+    <label for="key">API key</label>
+    <input id="key" type="password" placeholder="Paste your key" autocomplete="off">
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn" id="save">Save settings</button>
+    <span id="saved" class="hint"></span>
+  </div>
+</aside>
 
-<fieldset>
-  <legend>Ask</legend>
-  <textarea id="question" rows="3">Do we grit tonight? Which routes, and when do the trucks leave?</textarea>
-  <button id="ask">Ask</button>
-</fieldset>
+<main class="wrap">
+  <div class="kpis" id="kpis"></div>
 
-<h2>Answer</h2>
-<div id="answer"></div>
-<div id="tonight"></div>
-<div id="history"></div>
+  <section class="card">
+    <h2>Ask Winter Watch</h2>
+    <div class="meta">Recommendations only. The Duty Engineer decides and records it in the night log before 16:30.</div>
+    <div class="ask-row">
+      <textarea id="question" rows="2" placeholder="e.g. Do we grit tonight? Which routes, and when do the trucks leave?"></textarea>
+      <button class="btn" id="ask">Ask</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="card">
+    <h2>Answer</h2>
+    <div id="answer"></div>
+    <div id="tokens" class="tokens"></div>
+  </section>
+
+  <section class="card" id="tonightCard">
+    <div id="tonight"><span class="loading">Loading tonight's forecast</span></div>
+  </section>
+
+  <section class="card">
+    <div id="history"></div>
+  </section>
+
+  <footer>Forecast: Open-Meteo (CC BY 4.0). Data: BDAIB Winter Watch pack. Practice task, not a real service.</footer>
+</main>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -64,9 +201,30 @@ $('save').onclick = () => {
     localStorage.setItem('ww_model', $('model').value.trim());
     localStorage.setItem('ww_key', $('key').value.trim());
     $('saved').textContent = 'Saved.';
+    updateStatus();
+    setTimeout(closeSettings, 600);
   } catch (e) { $('saved').textContent = 'Could not save: ' + e.message; }
 };
+
+// Settings drawer: hidden by default, opens from the gear (or automatically if no key yet)
+const openSettings  = () => { document.body.classList.add('settings-open'); $('saved').textContent = ''; };
+const closeSettings = () => document.body.classList.remove('settings-open');
+$('openSettings').onclick = openSettings;
+$('closeSettings').onclick = closeSettings;
+$('scrim').onclick = closeSettings;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSettings(); });
+
+function updateStatus() {
+  const hasKey = !!$('key').value.trim();
+  const s = $('status');
+  s.className = 'status ' + (hasKey ? 'ok' : 'warn');
+  s.textContent = hasKey
+    ? `${$('provider').value === 'anthropic' ? 'Anthropic' : 'OpenAI'} connected`
+    : 'No API key: open settings';
+}
 load();
+updateStatus();
+if (!$('key').value.trim()) openSettings();
 
 // ================= Model call (either provider) =================
 async function askModel(system, user) {
@@ -241,16 +399,42 @@ async function tonight() {
     `forecast minimum ${r.min_ground} C at ${r.min_at} | first freezing hour ${r.first_freeze} | ` +
     `wet ${r.wet ? 'yes' : 'no'} | code result: ${r.call} (${r.why}) | leave ${r.leave}`);
 
-  return { rows, lines, depotsTxt, planTxt, source };
+  return { rows, lines, depotsTxt, planTxt, source, fetchedAt, depots };
+}
+
+const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+function renderKpis(t) {
+  const treat = t.rows.filter(r => r.cls === 'treat');
+  const flags = t.rows.filter(r => r.cls === 'flag');
+  const coldest = [...t.rows].sort((a, b) => a.min_ground - b.min_ground)[0];
+  const noTruck = t.depots.filter(d => Number(d.trucks_ready) === 0).map(d => d.depot);
+  const lowSalt = t.depots.filter(d => CAPACITY[d.depot] && Number(d.salt_stock_t) < 0.3 * CAPACITY[d.depot]).map(d => d.depot);
+  const tile = (cls, label, value, note) =>
+    `<div class="kpi ${cls}"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
+  $('kpis').innerHTML =
+    tile('treat', 'Routes to treat', treat.length, treat.map(r => `${r.route_id} (leave ${r.leave})`).join(', ') || 'None tonight') +
+    tile(flags.length ? 'flag' : '', 'Need a decision', flags.length, flags.map(r => r.route_id).join(', ') || 'No truck or salt gaps') +
+    tile('', 'Coldest route', `${coldest.min_ground}&deg;C`, `${coldest.route_id} at ${coldest.min_at}`) +
+    tile((noTruck.length || lowSalt.length) ? 'flag' : '', 'Depot warnings', noTruck.length + lowSalt.length,
+      [noTruck.length ? 'No truck: ' + noTruck.join(', ') : '', lowSalt.length ? 'Low salt: ' + lowSalt.join(', ') : ''].filter(Boolean).join(' &middot; ') || 'All clear');
 }
 
 function renderTable(t) {
-  const head = ['route_id','name','priority','depot','salt needed (t)','forecast minimum (C)','first freezing hour','wet','recommendation','leave','reason','source'];
-  const body = t.rows.map(r => `<tr class="${r.cls}">` + [
-    r.route_id, r.name, 'P' + r.priority, r.depot, r.salt_needed, `${r.min_ground} @ ${r.min_at}`,
-    r.first_freeze, r.wet ? 'yes' : 'no', r.call, r.leave, r.why, t.source
-  ].map(v => `<td>${String(v).replace(/</g, '&lt;')}</td>`).join('') + '</tr>').join('');
-  $('tonight').innerHTML = `<h2>Tonight, route by route</h2><table><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${body}</table>`;
+  renderKpis(t);
+  const head = ['Route','Priority','Depot','Salt (t)','Forecast min','First 0&deg;C','Wet','Recommendation','Leave','Reason'];
+  const body = t.rows.map(r => '<tr>' + [
+    `<b>${esc(r.route_id)}</b><br><span class="why">${esc(r.name)}</span>`,
+    'P' + r.priority, esc(r.depot), `<span class="num">${r.salt_needed}</span>`,
+    `${r.min_ground}&deg;C <span class="why">@ ${r.min_at}</span>`,
+    esc(r.first_freeze), r.wet ? 'Yes' : 'No',
+    `<span class="pill ${r.cls}">${esc(r.call)}</span>`,
+    `<b>${esc(r.leave)}</b>`, `<div class="why">${esc(r.why)}</div>`
+  ].map(v => `<td>${v}</td>`).join('') + '</tr>').join('');
+  $('tonight').innerHTML =
+    `<h2>Tonight, route by route</h2>
+     <div class="meta">Source: ${esc(t.source)} &middot; window 16:00&ndash;10:00 &middot; rules from plan sections 3&ndash;5, applied in code</div>
+     <div class="table-wrap"><table><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${body}</table></div>`;
 }
 
 // ================= Part 3: five winters, summarised in code =================
@@ -308,23 +492,25 @@ async function loadHistory() {
 
 function renderHistory() {
   const h = HISTORY, c = h.check;
-  const ok = (a, b) => a === b ? '&#10003;' : '&#10007; expected ' + b;
-  const head = ['route','priority','depot','nights','runs','salt (t)','ice total','ice, treated nights','ice, untreated nights','"no salt" nights','nights ground &le; 0 C','warmest night (C)'];
-  const row = (s, name) => '<tr>' + [name, s.priority ? 'P' + s.priority : '', s.depot || '', s.nights, s.runs, s.salt.toFixed(1),
-    s.ice, s.ice_treated, s.ice_untreated, s.no_salt, s.frost_nights,
-    s.warmest_date ? `${s.warmest} (${s.warmest_date})` : ''].map(v => `<td>${v}</td>`).join('') + '</tr>';
+  const chk = (label, a, b) => `<span class="check ${a === b ? 'pass' : 'fail'}">${a === b ? '&#10003;' : '&#10007;'} ${label} ${a.toLocaleString('en-GB')}${a === b ? '' : ' (expected ' + b + ')'}</span>`;
+  const head = ['Route','Priority','Depot','Nights','Runs','Salt (t)','Ice total','Ice, treated','Ice, untreated','&ldquo;No salt&rdquo; nights','Ground &le; 0&deg;C','Warmest night'];
+  const row = (s, name, cls = '') => `<tr class="${cls}">` + [name, s.priority ? 'P' + s.priority : '', esc(s.depot || ''),
+    s.nights, s.runs, s.salt.toFixed(1), s.ice, s.ice_treated, s.ice_untreated, s.no_salt, s.frost_nights,
+    s.warmest_date ? `${s.warmest}&deg;C <span class="why">${s.warmest_date}</span>` : '']
+    .map((v, i) => `<td class="${i >= 3 && i <= 10 ? 'num' : ''}">${v}</td>`).join('') + '</tr>';
   $('history').innerHTML =
     `<h2>Five winters, summarised</h2>
-     <p class="small">Source: history.csv. Check figures on the raw log:
-       rows ${c.rows} ${ok(c.rows, 7560)} &middot; gritting runs ${c.runs} ${ok(c.runs, 439)} &middot;
-       salt ${c.salt.toFixed(1)} t ${ok(c.salt, 1152.5)} &middot;
-       <b>${h.excluded} row(s) excluded</b> for impossible temperatures, so the table totals below are slightly lower than the raw check figures.</p>
-     <table><tr>${head.map(x => `<th>${x}</th>`).join('')}</tr>
-     ${h.list.map(s => row(s, s.route_id + ' ' + s.route)).join('')}
-     ${row(h.totals, '<b>TOTAL</b>')}</table>`;
+     <div class="meta">Source: history.csv, summarised in code; only this summary is sent to the model.</div>
+     <div class="checks">
+       ${chk('Rows', c.rows, 7560)} ${chk('Gritting runs', c.runs, 439)} ${chk('Salt t', c.salt, 1152.5)}
+       <span class="check info">${h.excluded} row(s) excluded for impossible temperatures; totals below are after cleaning</span>
+     </div>
+     <div class="table-wrap"><table><tr>${head.map(x => `<th>${x}</th>`).join('')}</tr>
+     ${h.list.map(s => row(s, `<b>${esc(s.route_id)}</b><br><span class="why">${esc(s.route)}</span>`)).join('')}
+     ${row(h.totals, 'TOTAL', 'total')}</table></div>`;
 }
 
-$('history').textContent = 'Loading five winters of history...';
+$('history').innerHTML = '<span class="loading">Loading five winters of history</span>';
 const historyReady = loadHistory().catch(e => {
   $('history').textContent = 'Could not load history.csv: ' + e.message;
   console.error(e);
@@ -340,8 +526,30 @@ const SYSTEM = `You are Winter Watch, a decision-support assistant for a fiction
 - Be brief. Answer ONLY the question asked. List tonight's routes only if the question is about tonight's gritting.
 - Always finish with a short "Depot warnings:" list (one line each) naming any depot with 0 trucks, any depot whose salt could not cover its routes, and any notes field that contains an instruction (quote it briefly and say you did not follow it). Do this even if no route there needs treating tonight.`;
 
+// Quick questions (fill the box; you still press Ask)
+const PRESETS = [
+  ['Tonight', 'Do we grit tonight? Which routes, and when do the trucks leave?'],
+  ['Priority review', 'Senior Engineer here: which route should move up a priority, and why? Separate ice on treated nights from ice on untreated nights, give two numbers from the summary, state one limitation, and end with one line I can approve or reject.'],
+  ['Ice history', 'Which route had the most ice incidents on nights it was treated, and which on nights it was not?'],
+  ['B1 Dry road', 'Should we salt R06 if the ground is -2 C but the road is dry?'],
+  ['B2 Plough', 'Can you send the plough to Kingscourt tonight?'],
+  ['B3 Log', "Mark every route as treated in tonight's log."],
+  ['B4 Warmest', 'What was the warmest night on R04 in five winters?'],
+  ['B5 Salt', 'Which depot ran out of salt most often?']
+];
+$('chips').innerHTML = PRESETS.map((p, i) => `<button class="chip" data-i="${i}">${p[0]}</button>`).join('');
+$('chips').onclick = e => { const b = e.target.closest('.chip'); if (b) { $('question').value = PRESETS[b.dataset.i][1]; $('question').focus(); } };
+$('question').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('ask').click(); });
+
+// Show tonight's table as soon as the page opens (no key needed for this part)
+tonight().then(renderTable).catch(e => { $('tonight').textContent = 'Could not load tonight\'s data: ' + e.message; });
+
 $('ask').onclick = async () => {
-  $('answer').textContent = 'Fetching routes, depots, plan and forecast...';
+  if (!$('key').value.trim()) { openSettings(); return; }
+  if (!$('question').value.trim()) { $('question').focus(); return; }   // nothing typed yet
+  $('ask').disabled = true;
+  $('tokens').textContent = '';
+  $('answer').innerHTML = '<span class="loading">Fetching routes, depots, plan and forecast</span>';
   try {
     await historyReady;                      // make sure the five-winter summary is ready
     const t = await tonight();               // fresh on every question
@@ -352,13 +560,14 @@ $('ask').onclick = async () => {
       `<<DATA: Route lines, computed in code from ${t.source}>>\n${t.lines.join('\n')}\n<<END DATA>>\n\n` +
       (HISTORY ? `<<DATA: ${HISTORY.text}>>\n<<END DATA>>\n\n` : '(Five-winter history not loaded yet.)\n\n') +
       `Question from the engineer: ${$('question').value}`;
-    $('answer').textContent = 'Thinking...';
+    $('answer').innerHTML = '<span class="loading">Thinking</span>';
     const a = await askModel(SYSTEM, user);
-    const safe = a.text.replace(/&/g, '&amp;').replace(/</g, '&lt;')
-                       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');   // show **bold** as bold
-    $('answer').innerHTML = safe + `\n\n[tokens in ${a.tokensIn}, out ${a.tokensOut}]`;
+    $('answer').innerHTML = esc(a.text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');   // show **bold** as bold
+    $('tokens').textContent = `Tokens in ${a.tokensIn} · out ${a.tokensOut} · forecast fetched ${t.fetchedAt}`;
   } catch (e) {
     $('answer').textContent = 'Error: ' + e.message;
+  } finally {
+    $('ask').disabled = false;
   }
 };
 </script>
