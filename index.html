@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Winter Watch</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+  fieldset { margin-bottom: 1rem; }
+  label { display: block; margin: .4rem 0 .2rem; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: .4rem; }
+  button { margin-top: .6rem; padding: .5rem 1rem; }
+  #answer { white-space: pre-wrap; background: #f4f4f4; padding: 1rem; min-height: 3rem; }
+  .small { color: #666; font-size: .85rem; }
+</style>
+</head>
+<body>
+<h1>Winter Watch</h1>
+<p class="small">Decision support only. The Duty Engineer makes the final call.</p>
+
+<fieldset>
+  <legend>Settings (stored only in this browser)</legend>
+  <label for="provider">Provider</label>
+  <select id="provider">
+    <option value="anthropic">Anthropic</option>
+    <option value="openai">OpenAI</option>
+  </select>
+  <label for="model">Model</label>
+  <input id="model" placeholder="e.g. claude-haiku-5-5 or gpt-4o-mini">
+  <label for="key">API key</label>
+  <input id="key" type="password" placeholder="Paste your key - never commit it">
+  <button id="save">Save settings</button>
+  <span id="saved" class="small"></span>
+</fieldset>
+
+<fieldset>
+  <legend>Ask</legend>
+  <textarea id="question" rows="3" placeholder="Should we grit tonight?"></textarea>
+  <button id="ask">Ask</button>
+</fieldset>
+
+<h2>Answer</h2>
+<div id="answer"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// --- settings: localStorage only, never in the repo ---
+function load() {
+  try {
+    $('provider').value = localStorage.getItem('ww_provider') || 'anthropic';
+    $('model').value    = localStorage.getItem('ww_model') || '';
+    $('key').value      = localStorage.getItem('ww_key') || '';
+  } catch (e) {}
+}
+$('save').onclick = () => {
+  try {
+    localStorage.setItem('ww_provider', $('provider').value);
+    localStorage.setItem('ww_model', $('model').value.trim());
+    localStorage.setItem('ww_key', $('key').value.trim());
+    $('saved').textContent = 'Saved.';
+  } catch (e) { $('saved').textContent = 'Could not save: ' + e.message; }
+};
+load();
+
+// --- one function that talks to either provider ---
+async function askModel(system, user) {
+  const provider = $('provider').value;
+  const key = $('key').value.trim();
+  const model = $('model').value.trim();
+  if (!key) throw new Error('No API key set.');
+
+  if (provider === 'anthropic') {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: model || 'claude-haiku-5-5',
+        max_tokens: 800,
+        system,
+        messages: [{ role: 'user', content: user }]
+      })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(r.status + ' ' + (j.error?.message || JSON.stringify(j)));
+    return { text: j.content.map(c => c.text || '').join(''), usage: j.usage };
+  } else {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model: model || 'gpt-4o-mini',
+        messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+      })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(r.status + ' ' + (j.error?.message || JSON.stringify(j)));
+    return { text: j.choices[0].message.content, usage: j.usage };
+  }
+}
+
+// --- Part 1: plain question. Part 2 will add the data in here. ---
+const SYSTEM = 'You are a decision-support assistant for a fictional County Cavan roads team. ' +
+  'You recommend; a human Duty Engineer decides. Be brief.';
+
+$('ask').onclick = async () => {
+  $('answer').textContent = 'Thinking...';
+  try {
+    const { text, usage } = await askModel(SYSTEM, $('question').value);
+    $('answer').textContent = text + '\n\n[tokens: ' + JSON.stringify(usage) + ']';
+  } catch (e) {
+    $('answer').textContent = 'Error: ' + e.message;
+  }
+};
+</script>
+</body>
+</html>
