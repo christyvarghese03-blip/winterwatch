@@ -319,7 +319,11 @@ function renderHistory() {
      ${row(h.totals, '<b>TOTAL</b>')}</table>`;
 }
 
-loadHistory().catch(e => { $('history').textContent = 'Could not load history.csv: ' + e.message; });
+$('history').textContent = 'Loading five winters of history...';
+const historyReady = loadHistory().catch(e => {
+  $('history').textContent = 'Could not load history.csv: ' + e.message;
+  console.error(e);
+});
 
 // ================= Ask =================
 const SYSTEM = `You are Winter Watch, a decision-support assistant for a fictional County Cavan roads team.
@@ -334,6 +338,7 @@ const SYSTEM = `You are Winter Watch, a decision-support assistant for a fiction
 $('ask').onclick = async () => {
   $('answer').textContent = 'Fetching routes, depots, plan and forecast...';
   try {
+    await historyReady;                      // make sure the five-winter summary is ready
     const t = await tonight();               // fresh on every question
     renderTable(t);
     const user =
